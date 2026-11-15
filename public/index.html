@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThinkBig Agency CRM</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #FAFAFA; }
+    h1, h2, h3, .font-display { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
+</head>
+<body class="text-zinc-900 min-h-screen pb-20 antialiased selection:bg-zinc-900 selection:text-white">
+
+  <!-- Minimal PIN Lock Overlay (Admin PIN: 1998) -->
+  <div id="pinLockModal" class="fixed inset-0 bg-white/95 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-zinc-200 p-8 rounded-2xl w-full max-w-xs text-center shadow-lg space-y-5">
+      <div class="w-10 h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-center mx-auto text-xs font-bold tracking-tighter">
+        TB
+      </div>
+      <div class="space-y-1">
+        <h2 class="text-zinc-900 font-bold text-base tracking-tight">ThinkBig Workspace</h2>
+        <p class="text-xs text-zinc-500">Enter your 4-digit admin PIN</p>
+      </div>
+      <div class="space-y-3">
+        <input type="password" id="pinInput" maxlength="8" placeholder="••••" autofocus
+          onkeydown="if(event.key === 'Enter') verifyPin()"
+          class="w-full text-center text-lg tracking-[0.4em] p-2.5 rounded-xl bg-zinc-50 text-zinc-900 border border-zinc-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900 transition">
+        <p id="pinError" class="text-xs text-red-600 font-medium hidden">Invalid PIN. Please enter 1998.</p>
+        <button type="button" onclick="verifyPin()" class="w-full bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] transition text-white font-medium py-2.5 rounded-xl text-xs shadow-sm">
+          Unlock Workspace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal Full-Width Sticky Header -->
+  <header class="bg-white/90 backdrop-blur-md border-b border-zinc-200 px-4 sm:px-8 py-3.5 sticky top-0 z-20 flex flex-wrap justify-between items-center gap-3 w-full">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 bg-zinc-900 text-white font-bold rounded-lg flex items-center justify-center text-xs tracking-tighter">TB</div>
+      <div>
+        <h1 class="text-sm sm:text-base font-bold tracking-tight text-zinc-900">ThinkBig CRM</h1>
+        <p class="text-[11px] text-zinc-500">Leads • Multi-Service Proposals • Team Payouts</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Segmented View Switcher -->
+      <div class="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200/70 text-xs font-medium">
+        <button id="btnGridView" onclick="setViewMode('grid')" class="px-3 py-1.5 rounded-lg bg-white text-zinc-900 shadow-xs transition">Grid</button>
+        <button id="btnKanbanView" onclick="setViewMode('kanban')" class="px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 transition">Kanban</button>
+        <button id="btnTableView" onclick="setViewMode('table')" class="px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 transition">Table</button>
+        <button id="btnExpensesView" onclick="setViewMode('expenses')" class="px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 transition">Team Payouts</button>
+      </div>
+
+      <button onclick="exportCSV()" class="bg-white hover:bg-zinc-50 text-zinc-700 font-medium px-3 py-2 rounded-xl text-xs border border-zinc-200 transition">
+        Export CSV
+      </button>
+      <button onclick="openServiceModal()" class="bg-white hover:bg-zinc-50 text-zinc-700 font-medium px-3 py-2 rounded-xl text-xs border border-zinc-200 transition">
+        Services
+      </button>
+      <button onclick="lockDashboard()" class="bg-white hover:bg-zinc-50 text-zinc-500 hover:text-zinc-900 font-medium px-3 py-2 rounded-xl text-xs border border-zinc-200 transition">
+        Lock
+      </button>
+      <button onclick="openExpenseModal()" class="bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-medium px-3.5 py-2 rounded-xl text-xs transition">
+        + Pay Dev
+      </button>
+      <button onclick="openModal()" class="bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] transition text-white font-medium px-4 py-2 rounded-xl text-xs shadow-xs">
+        + New Lead
+      </button>
+    </div>
+  </header>
+
+  <!-- Full-Width Main Container -->
+  <main class="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Subtle Follow-up Alert Banner -->
+    <div id="followupAlertBanner" class="hidden bg-amber-50/90 border border-amber-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center space-x-2.5">
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <div>
+          <p class="text-xs font-semibold text-amber-950" id="followupAlertTitle">Follow-ups Due</p>
+          <p class="text-[11px] text-amber-800" id="followupAlertList"></p>
+        </div>
+      </div>
+      <button onclick="filterDueFollowups()" class="bg-white hover:bg-amber-100/50 text-amber-900 border border-amber-300 text-xs font-medium px-3 py-1 rounded-lg transition">
+        Filter Due Leads
+      </button>
+    </div>
+
+    <!-- Minimal KPI Row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Total Pipeline</p>
+        <p id="finTotal" class="font-display font-bold text-base sm:text-lg text-zinc-900 mt-1">₹0</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Collected</p>
+        <p id="finPaid" class="font-display font-bold text-base sm:text-lg text-emerald-600 mt-1">₹0</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Client Pending</p>
+        <p id="finPending" class="font-display font-bold text-base sm:text-lg text-zinc-900 mt-1">₹0</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Team Paid</p>
+        <p id="finDevPaid" class="font-display font-bold text-base sm:text-lg text-zinc-700 mt-1">₹0</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Team Payable</p>
+        <p id="finDevPending" class="font-display font-bold text-base sm:text-lg text-amber-600 mt-1">₹0</p>
+      </div>
+      <div class="bg-zinc-900 text-white p-4 rounded-xl">
+        <p class="text-[11px] text-zinc-400 font-medium">Net Profit</p>
+        <p id="finNetProfit" class="font-display font-bold text-base sm:text-lg text-white mt-1">₹0</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Retainers</p>
+        <p id="finRetainer" class="font-display font-bold text-base sm:text-lg text-zinc-900 mt-1">₹0/mo</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-zinc-200/80">
+        <p class="text-[11px] text-zinc-500 font-medium">Active Firms</p>
+        <p id="statTotal" class="font-display font-bold text-base sm:text-lg text-zinc-900 mt-1">0</p>
+      </div>
+    </div>
+
+    <!-- Search & Filter Bar (Leads) -->
+    <div id="leadsFilterBar" class="bg-white p-3 rounded-xl border border-zinc-200/80 flex flex-col lg:flex-row gap-2.5 items-center justify-between">
+      <div class="w-full lg:flex-1">
+        <input type="text" id="searchInput" oninput="renderLeads()" placeholder="Search firm, contact person, phone, service, or notes..." 
+          class="w-full py-2 px-3.5 rounded-lg border border-zinc-200 text-xs sm:text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:border-zinc-900 transition">
+      </div>
+      
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full lg:w-auto">
+        <select id="serviceFilter" onchange="renderLeads()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium focus:outline-none focus:border-zinc-900">
+          <option value="All">All Services</option>
+        </select>
+
+        <select id="billingFilter" onchange="renderLeads()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium focus:outline-none focus:border-zinc-900">
+          <option value="All">All Billing</option>
+          <option value="One-Time">One-Time</option>
+          <option value="Monthly Retainer">Monthly Retainer</option>
+        </select>
+
+        <select id="statusFilter" onchange="renderLeads()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium focus:outline-none focus:border-zinc-900">
+          <option value="All">All Stages</option>
+          <option value="New">New</option>
+          <option value="Proposal Sent">Proposal Sent</option>
+          <option value="Negotiation">Negotiation</option>
+          <option value="Closed">Closed / Won</option>
+        </select>
+
+        <select id="paymentFilter" onchange="renderLeads()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium focus:outline-none focus:border-zinc-900">
+          <option value="All">All Payments</option>
+          <option value="Unpaid">Unpaid</option>
+          <option value="Partial">Partial</option>
+          <option value="Paid">Paid</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Search & Filter Bar (Team Payouts) -->
+    <div id="expensesFilterBar" class="hidden bg-white p-3 rounded-xl border border-zinc-200/80 flex flex-col lg:flex-row gap-2.5 items-center justify-between">
+      <div class="w-full lg:flex-1">
+        <input type="text" id="expenseSearchInput" oninput="renderExpenses()" placeholder="Search developer name, role, project, or notes..." 
+          class="w-full py-2 px-3.5 rounded-lg border border-zinc-200 text-xs sm:text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:border-zinc-900 transition">
+      </div>
+      <div class="flex flex-wrap gap-2 w-full lg:w-auto">
+        <select id="expenseRoleFilter" onchange="renderExpenses()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium">
+          <option value="All">All Roles</option>
+          <option value="Web Developer">Web Developer</option>
+          <option value="UI/UX Designer">UI/UX Designer</option>
+          <option value="SEO Specialist">SEO Specialist</option>
+          <option value="Video Editor / Reels">Video Editor / Reels</option>
+          <option value="AI / Automation Dev">AI / Automation Dev</option>
+          <option value="Copywriter / Ads">Copywriter / Ads</option>
+          <option value="Server / Tool Subscription">Server / Tool Cost</option>
+        </select>
+        <select id="expenseStatusFilter" onchange="renderExpenses()" class="py-2 px-3 rounded-lg border border-zinc-200 text-xs bg-white text-zinc-700 font-medium">
+          <option value="All">All Statuses</option>
+          <option value="Unpaid">Unpaid</option>
+          <option value="Partial">Partial</option>
+          <option value="Paid">Paid</option>
+        </select>
+        <button onclick="openExpenseModal()" class="bg-zinc-900 hover:bg-zinc-800 text-white font-medium px-3.5 py-2 rounded-lg text-xs">
+          + Record Payout
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Dynamic Content Wrapper -->
+    <div id="leadsWrapper" class="w-full"></div>
+
+  </main>
+
+  <!-- Manage Services Modal -->
+  <div id="serviceModal" class="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs hidden flex items-center justify-center p-4 z-40">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl border border-zinc-200 space-y-4">
+      <div class="flex justify-between items-center border-b border-zinc-100 pb-3">
+        <h2 class="text-sm font-bold text-zinc-900">Manage Agency Services</h2>
+        <button onclick="closeServiceModal()" class="text-zinc-400 hover:text-zinc-700 text-lg">&times;</button>
+      </div>
+      <form onsubmit="addService(event)" class="flex gap-2">
+        <input type="text" id="newServiceName" required placeholder="e.g. Paid Ads, Branding, GMB SEO..." class="flex-1 p-2.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-900">
+        <button type="submit" class="bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl text-xs font-medium">Add</button>
+      </form>
+      <div id="servicesList" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
+      <div class="text-right pt-2 border-t border-zinc-100">
+        <button onclick="closeServiceModal()" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-medium">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Developer Payout Modal -->
+  <div id="expenseModal" class="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-40">
+    <div class="bg-white rounded-t-2xl sm:rounded-2xl p-6 w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-xl border border-zinc-200">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-zinc-100">
+        <h2 id="expenseModalTitle" class="text-base font-bold text-zinc-900">Record Team / Developer Payout</h2>
+        <button onclick="closeExpenseModal()" class="text-zinc-400 hover:text-zinc-700 text-xl">&times;</button>
+      </div>
+
+      <form id="expenseForm" onsubmit="saveExpense(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="expenseId">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Developer / Member Name *</label>
+            <input type="text" id="exp_person_name" required placeholder="e.g. Karthik" class="w-full p-2.5 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900">
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Role / Skill *</label>
+            <select id="exp_role" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+              <option value="Web Developer">Web Developer</option>
+              <option value="UI/UX Designer">UI/UX Designer</option>
+              <option value="SEO Specialist">SEO Specialist</option>
+              <option value="Video Editor / Reels">Video Editor / Reels</option>
+              <option value="AI / Automation Dev">AI / Automation Dev</option>
+              <option value="Copywriter / Ads">Copywriter / Ads</option>
+              <option value="Server / Tool Subscription">Server / Tool Cost</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Client Project</label>
+            <select id="exp_lead_id" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+              <option value="">General Agency Expense</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">WhatsApp Phone</label>
+            <input type="tel" id="exp_phone" placeholder="9845012345" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+        </div>
+
+        <div class="bg-zinc-50 p-4 rounded-xl border border-zinc-200/80 space-y-2.5">
+          <p class="font-semibold text-zinc-700 text-[11px] uppercase tracking-wider">Payout Details</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-zinc-500 mb-1">Agreed Fee (₹)</label>
+              <input type="number" id="exp_total_fee" value="0" min="0" oninput="autoCalcExpenseStatus()" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white">
+            </div>
+            <div>
+              <label class="block text-zinc-500 mb-1">Amount Paid (₹)</label>
+              <input type="number" id="exp_amount_paid" value="0" min="0" oninput="autoCalcExpenseStatus()" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white">
+            </div>
+            <div>
+              <label class="block text-zinc-500 mb-1">Status</label>
+              <select id="exp_payment_status" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partial">Partial</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Date</label>
+            <input type="date" id="exp_payment_date" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Task / Milestone Notes</label>
+            <input type="text" id="exp_notes" placeholder="Deliverables or payment reference" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-2.5 pt-3 border-t border-zinc-100">
+          <button type="button" onclick="closeExpenseModal()" class="px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-medium">Save Payout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / Edit Lead Modal -->
+  <div id="leadModal" class="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-30">
+    <div class="bg-white rounded-t-2xl sm:rounded-2xl p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-xl border border-zinc-200">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-zinc-100">
+        <h2 id="modalTitle" class="text-base font-bold text-zinc-900">New Firm & Proposal</h2>
+        <button onclick="closeModal()" class="text-zinc-400 hover:text-zinc-700 text-xl">&times;</button>
+      </div>
+
+      <form id="leadForm" onsubmit="saveLead(event)" class="space-y-4 text-xs" enctype="multipart/form-data">
+        <input type="hidden" id="leadId">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Firm / Company Name *</label>
+            <input type="text" id="firm_name" required placeholder="e.g. SwissIkon" class="w-full p-2.5 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900">
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Contact Person *</label>
+            <input type="text" id="name" required placeholder="e.g. Vikram Mehta" class="w-full p-2.5 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900">
+          </div>
+        </div>
+
+        <!-- MULTI-SERVICE PILLS -->
+        <div class="bg-zinc-50 p-3.5 rounded-xl border border-zinc-200/80 space-y-2">
+          <div class="flex justify-between items-center">
+            <label class="font-semibold text-zinc-700 text-[11px] uppercase tracking-wider">Select Services (Single or Multi) *</label>
+            <button type="button" onclick="openServiceModal()" class="text-xs text-zinc-900 font-medium underline">+ Edit Services</button>
+          </div>
+          <div id="multiServiceContainer" class="flex flex-wrap gap-1.5 pt-1"></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Billing Type</label>
+            <select id="billing_type" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+              <option value="One-Time">One-Time Project</option>
+              <option value="Monthly Retainer">Monthly Retainer</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Lead Source</label>
+            <select id="source" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+              <option value="Instagram">Instagram</option>
+              <option value="Google Search / Maps">Google Search / Maps</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Referral">Referral</option>
+              <option value="Cold Outreach">Cold Outreach</option>
+              <option value="Direct">Direct</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">WhatsApp Phone</label>
+            <input type="tel" id="phone" placeholder="9845012345" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Email</label>
+            <input type="email" id="email" placeholder="client@firm.com" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Pipeline Stage</label>
+            <select id="status" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+              <option value="New">New</option>
+              <option value="Proposal Sent">Proposal Sent</option>
+              <option value="Negotiation">Negotiation</option>
+              <option value="Closed">Closed / Won</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-zinc-700 mb-1">Next Follow-up Date</label>
+            <input type="date" id="followup_date" class="w-full p-2.5 border border-zinc-200 rounded-xl">
+          </div>
+        </div>
+
+        <div class="bg-zinc-50 p-4 rounded-xl border border-zinc-200/80 space-y-2.5">
+          <p class="font-semibold text-zinc-700 text-[11px] uppercase tracking-wider">Commercials & Payment</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-zinc-500 mb-1">Package Value (₹)</label>
+              <input type="number" id="deal_value" value="0" min="0" oninput="autoCalcPaymentStatus()" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white">
+            </div>
+            <div>
+              <label class="block text-zinc-500 mb-1">Received (₹)</label>
+              <input type="number" id="amount_paid" value="0" min="0" oninput="autoCalcPaymentStatus()" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white">
+            </div>
+            <div>
+              <label class="block text-zinc-500 mb-1">Pay Status</label>
+              <select id="payment_status" class="w-full p-2.5 border border-zinc-200 rounded-xl bg-white font-medium">
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partial">Partial</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-zinc-50 p-4 rounded-xl border border-zinc-200/80 space-y-1.5">
+          <label class="block font-semibold text-zinc-700 text-[11px] uppercase tracking-wider">Proposal Document (PDF, Max 5MB)</label>
+          <input type="file" id="proposal" accept="application/pdf" class="w-full text-xs text-zinc-600 file:mr-3 file:py-1.5 file:px-3.5 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-zinc-900 file:text-white hover:file:bg-zinc-800">
+          <p id="currentPdfLabel" class="text-xs text-zinc-600 font-medium hidden"></p>
+        </div>
+
+        <div>
+          <label class="block font-medium text-zinc-700 mb-1">Scope & Deliverables</label>
+          <textarea id="notes" rows="3" placeholder="Deliverables, milestones, or client notes..." class="w-full p-2.5 border border-zinc-200 rounded-xl"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-2.5 pt-3 border-t border-zinc-100">
+          <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-medium">Save Lead</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let allLeads = [];
+    let allServices = [];
+    let allExpenses = [];
+    let selectedServicesInModal = [];
+    let viewMode = 'grid';
+    let onlyDueFollowups = false;
+
+    const formatINR = (num) => '₹' + Number(num || 0).toLocaleString('en-IN');
+    const todayStr = () => new Date().toISOString().split('T')[0];
+
+    function parseServices(serviceStr) {
+      if (!serviceStr) return ['SMM'];
+      return serviceStr.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    function renderServiceBadges(serviceStr) {
+      return parseServices(serviceStr).map(srv =>
+        `<span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200/80">${srv}</span>`
+      ).join('');
+    }
+
+    // --- 1. PIN AUTHENTICATION (PIN: 1998) ---
+    const ADMIN_PIN = '1998';
+
+    if (sessionStorage.getItem('crm_unlocked') === 'true') {
+      document.getElementById('pinLockModal').classList.add('hidden');
+    }
+
+    function lockDashboard() {
+      sessionStorage.removeItem('crm_unlocked');
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinError').classList.add('hidden');
+      document.getElementById('pinLockModal').classList.remove('hidden');
+    }
+
+    async function verifyPin(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const inputEl = document.getElementById('pinInput');
+      const errorEl = document.getElementById('pinError');
+      const modalEl = document.getElementById('pinLockModal');
+      const enteredPin = String(inputEl.value || '').trim();
+
+      if (enteredPin === ADMIN_PIN) {
+        sessionStorage.setItem('crm_unlocked', 'true');
+        errorEl.classList.add('hidden');
+        modalEl.classList.add('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: enteredPin })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          sessionStorage.setItem('crm_unlocked', 'true');
+          errorEl.classList.add('hidden');
+          modalEl.classList.add('hidden');
+        } else {
+          errorEl.classList.remove('hidden');
+          inputEl.value = '';
+          inputEl.focus();
+        }
+      } catch (err) {
+        errorEl.classList.remove('hidden');
+      }
+    }
+
+    // --- 2. 1-CLICK CLIENT INVOICE & DEV VOUCHER PDF ---
+    function generateInvoicePDF(id) {
+      const lead = allLeads.find(l => l.id === id);
+      if (!lead) return;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const deal = Number(lead.deal_value) || 0;
+      const paid = Number(lead.amount_paid) || 0;
+      const balance = Math.max(0, deal - paid);
+      const invDate = new Date().toLocaleDateString('en-IN');
+
+      doc.setFillColor(24, 24, 27);
+      doc.rect(0, 0, 210, 38, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('THINKBIG DIGITAL AGENCY', 14, 19);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('INVOICE & PAYMENT STATEMENT', 14, 27);
+      doc.text(`Date: ${invDate}  |  #INV-${1000 + lead.id}`, 140, 23);
+
+      doc.setTextColor(24, 24, 27);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Billed To:', 14, 52);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Firm: ${lead.firm_name || lead.name}`, 14, 60);
+      doc.text(`Attn: ${lead.name}`, 14, 66);
+      doc.text(`Phone: ${lead.phone || 'N/A'}  |  Email: ${lead.email || 'N/A'}`, 14, 72);
+
+      doc.setFillColor(244, 244, 245);
+      doc.rect(14, 84, 182, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.text('Services Package', 18, 91);
+      doc.text('Cycle', 115, 91);
+      doc.text('Amount (INR)', 160, 91);
+
+      doc.setFont('helvetica', 'normal');
+      const wrappedServices = doc.splitTextToSize(lead.service_type || 'Digital Services', 90);
+      doc.text(wrappedServices, 18, 103);
+      doc.text(`${lead.billing_type || 'One-Time'}`, 115, 103);
+      doc.text(`Rs. ${deal.toLocaleString('en-IN')}`, 160, 103);
+
+      const lineY = 103 + (wrappedServices.length * 6) + 4;
+      doc.setDrawColor(228, 228, 231);
+      doc.line(14, lineY, 196, lineY);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total Value:`, 120, lineY + 10);
+      doc.text(`Rs. ${deal.toLocaleString('en-IN')}`, 160, lineY + 10);
+
+      doc.text(`Received:`, 120, lineY + 18);
+      doc.text(`Rs. ${paid.toLocaleString('en-IN')}`, 160, lineY + 18);
+
+      doc.text(`Balance Due (${lead.payment_status}):`, 120, lineY + 26);
+      doc.text(`Rs. ${balance.toLocaleString('en-IN')}`, 160, lineY + 26);
+
+      if (lead.notes) {
+        doc.setFontSize(9);
+        doc.text('Scope & Deliverables:', 14, lineY + 42);
+        doc.setFont('helvetica', 'normal');
+        const splitNotes = doc.splitTextToSize(lead.notes, 180);
+        doc.text(splitNotes, 14, lineY + 48);
+      }
+
+      const cleanFirm = (lead.firm_name || lead.name).replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Invoice_${cleanFirm}.pdf`);
+    }
+
+    function generateVoucherPDF(expId) {
+      const exp = allExpenses.find(e => e.id === expId);
+      if (!exp) return;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const fee = Number(exp.total_fee) || 0;
+      const paid = Number(exp.amount_paid) || 0;
+      const balance = Math.max(0, fee - paid);
+
+      doc.setFillColor(24, 24, 27);
+      doc.rect(0, 0, 210, 36, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TEAM PAYOUT VOUCHER', 14, 19);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`#PAY-${500 + exp.id}  |  Date: ${exp.payment_date || todayStr()}`, 14, 27);
+
+      doc.setTextColor(24, 24, 27);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Payee: ${exp.person_name}`, 14, 50);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Role: ${exp.role}`, 14, 58);
+      doc.text(`Project: ${exp.firm_name || 'General Agency'}`, 14, 66);
+      doc.text(`Agreed Fee: Rs. ${fee.toLocaleString('en-IN')}`, 14, 78);
+      doc.text(`Paid Out: Rs. ${paid.toLocaleString('en-IN')}`, 14, 86);
+      doc.text(`Balance Due: Rs. ${balance.toLocaleString('en-IN')} (${exp.payment_status})`, 14, 94);
+
+      if (exp.notes) {
+        doc.text(`Notes: ${exp.notes}`, 14, 108);
+      }
+
+      doc.save(`Payout_${exp.person_name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    }
+
+    // --- 3. CSV EXPORT ---
+    function exportCSV() {
+      if (viewMode === 'expenses') {
+        if (allExpenses.length === 0) return alert('No expenses to export!');
+        const headers = ['ID', 'Payee', 'Role', 'Project', 'Phone', 'Total Fee', 'Paid', 'Pending', 'Status', 'Date', 'Notes'];
+        const rows = allExpenses.map(e => {
+          const bal = Math.max(0, (Number(e.total_fee) || 0) - (Number(e.amount_paid) || 0));
+          return [
+            e.id, `"${e.person_name}"`, `"${e.role}"`, `"${e.firm_name || 'General'}"`, `"${e.phone || ''}"`,
+            e.total_fee || 0, e.amount_paid || 0, bal, e.payment_status, e.payment_date || '', `"${(e.notes || '').replace(/"/g, '""')}"`
+          ].join(',');
+        });
+        const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+        const link = document.createElement('a');
+        link.setAttribute('href', encodeURI(csv));
+        link.setAttribute('download', `Team_Payouts_${todayStr()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      if (allLeads.length === 0) return alert('No leads to export!');
+      const headers = ['ID', 'Firm Name', 'Contact Person', 'Services', 'Billing Type', 'Phone', 'Email', 'Source', 'Stage', 'Deal Value', 'Paid', 'Pending Balance', 'Payment Status', 'Followup Date', 'Notes'];
+      const rows = allLeads.map(l => {
+        const balance = Math.max(0, (Number(l.deal_value) || 0) - (Number(l.amount_paid) || 0));
+        return [
+          l.id, `"${(l.firm_name || '').replace(/"/g, '""')}"`, `"${(l.name || '').replace(/"/g, '""')}"`,
+          `"${(l.service_type || '').replace(/"/g, '""')}"`, `"${l.billing_type || 'One-Time'}"`, `"${l.phone || ''}"`,
+          `"${l.email || ''}"`, `"${l.source || ''}"`, `"${l.status || ''}"`,
+          l.deal_value || 0, l.amount_paid || 0, balance, l.payment_status || 'Unpaid',
+          l.followup_date || '', `"${(l.notes || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`
+        ].join(',');
+      });
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+      const link = document.createElement('a');
+      link.setAttribute('href', encodeURI(csvContent));
+      link.setAttribute('download', `Agency_Leads_${todayStr()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // --- 4. VIEW SWITCHER ---
+    function setViewMode(mode) {
+      viewMode = mode;
+      ['grid', 'kanban', 'table', 'expenses'].forEach(m => {
+        const btn = document.getElementById(`btn${m.charAt(0).toUpperCase() + m.slice(1)}View`);
+        if (btn) {
+          btn.className = (m === mode)
+            ? 'px-3 py-1.5 rounded-lg bg-white text-zinc-900 shadow-xs transition'
+            : 'px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 transition';
+        }
+      });
+
+      if (mode === 'expenses') {
+        document.getElementById('leadsFilterBar').classList.add('hidden');
+        document.getElementById('expensesFilterBar').classList.remove('hidden');
+        renderExpenses();
+      } else {
+        document.getElementById('expensesFilterBar').classList.add('hidden');
+        document.getElementById('leadsFilterBar').classList.remove('hidden');
+        renderLeads();
+      }
+    }
+
+    async function quickChangeStage(id, newStage) {
+      await fetch(`/api/leads/${id}/stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStage })
+      });
+      fetchAllData();
+    }
+
+    function filterDueFollowups() {
+      onlyDueFollowups = !onlyDueFollowups;
+      renderLeads();
+    }
+
+    // --- 5. MULTI-SERVICE PILL SELECTOR ---
+    function renderMultiServicePills() {
+      const container = document.getElementById('multiServiceContainer');
+      const allAvailableNames = new Set([
+        ...allServices.map(s => s.name),
+        ...selectedServicesInModal
+      ]);
+
+      container.innerHTML = [...allAvailableNames].map(serviceName => {
+        const isSelected = selectedServicesInModal.includes(serviceName);
+        return `
+          <button type="button" onclick="toggleServicePill('${serviceName.replace(/'/g, "\\'")}')"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
+              isSelected 
+                ? 'bg-zinc-900 text-white border-zinc-900' 
+                : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+            }">
+            <span>${isSelected ? '✓' : '+'}</span>
+            <span>${serviceName}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function toggleServicePill(serviceName) {
+      if (selectedServicesInModal.includes(serviceName)) {
+        if (selectedServicesInModal.length > 1) {
+          selectedServicesInModal = selectedServicesInModal.filter(s => s !== serviceName);
+        }
+      } else {
+        selectedServicesInModal.push(serviceName);
+      }
+      renderMultiServicePills();
+    }
+
+    async function fetchServices() {
+      const res = await fetch('/api/services');
+      allServices = await res.json();
+
+      const filterSelect = document.getElementById('serviceFilter');
+      const currentFilter = filterSelect.value || 'All';
+      filterSelect.innerHTML = `<option value="All">All Services</option>` +
+        allServices.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      filterSelect.value = currentFilter;
+
+      const listContainer = document.getElementById('servicesList');
+      listContainer.innerHTML = allServices.map(s => `
+        <div class="flex justify-between items-center bg-zinc-50 px-3.5 py-2 rounded-xl border border-zinc-200/80 text-xs">
+          <span class="font-medium text-zinc-800">${s.name}</span>
+          <button onclick="deleteService(${s.id})" class="text-zinc-400 hover:text-red-600 font-medium">Remove</button>
+        </div>
+      `).join('');
+
+      renderMultiServicePills();
+    }
+
+    async function addService(e) {
+      e.preventDefault();
+      const input = document.getElementById('newServiceName');
+      const newName = input.value.trim();
+      if (!newName) return;
+
+      await fetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      });
+      if (!selectedServicesInModal.includes(newName)) {
+        selectedServicesInModal.push(newName);
+      }
+      input.value = '';
+      await fetchServices();
+    }
+
+    async function deleteService(id) {
+      await fetch(`/api/services/${id}`, { method: 'DELETE' });
+      await fetchServices();
+    }
+
+    function openServiceModal() { document.getElementById('serviceModal').classList.remove('hidden'); }
+    function closeServiceModal() { document.getElementById('serviceModal').classList.add('hidden'); }
+
+    function autoCalcPaymentStatus() {
+      const deal = Number(document.getElementById('deal_value').value) || 0;
+      const paid = Number(document.getElementById('amount_paid').value) || 0;
+      const select = document.getElementById('payment_status');
+      if (paid <= 0) select.value = 'Unpaid';
+      else if (paid >= deal && deal > 0) select.value = 'Paid';
+      else select.value = 'Partial';
+    }
+
+    function autoCalcExpenseStatus() {
+      const fee = Number(document.getElementById('exp_total_fee').value) || 0;
+      const paid = Number(document.getElementById('exp_amount_paid').value) || 0;
+      const select = document.getElementById('exp_payment_status');
+      if (paid <= 0) select.value = 'Unpaid';
+      else if (paid >= fee && fee > 0) select.value = 'Paid';
+      else select.value = 'Partial';
+    }
+
+    async function fetchAllData() {
+      const [leadsRes, expRes] = await Promise.all([
+        fetch('/api/leads'),
+        fetch('/api/expenses')
+      ]);
+      allLeads = await leadsRes.json();
+      allExpenses = await expRes.json();
+      populateClientDropdownForExpenses();
+      updateStats();
+      if (viewMode === 'expenses') renderExpenses();
+      else renderLeads();
+    }
+
+    function populateClientDropdownForExpenses() {
+      const select = document.getElementById('exp_lead_id');
+      select.innerHTML = `<option value="">General Agency Expense</option>` +
+        allLeads.map(l => `<option value="${l.id}">${l.firm_name || l.name} (${l.service_type || 'Project'})</option>`).join('');
+    }
+
+    function updateStats() {
+      document.getElementById('statTotal').innerText = allLeads.length;
+
+      const totalDeal = allLeads.reduce((sum, l) => sum + (Number(l.deal_value) || 0), 0);
+      const totalPaid = allLeads.reduce((sum, l) => sum + (Number(l.amount_paid) || 0), 0);
+      const totalPending = Math.max(0, totalDeal - totalPaid);
+
+      const devTotalFee = allExpenses.reduce((sum, e) => sum + (Number(e.total_fee) || 0), 0);
+      const devTotalPaid = allExpenses.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0);
+      const devPending = Math.max(0, devTotalFee - devTotalPaid);
+
+      const netProfit = totalPaid - devTotalPaid;
+
+      const monthlyRetainerTotal = allLeads
+        .filter(l => l.billing_type === 'Monthly Retainer' && l.status === 'Closed')
+        .reduce((sum, l) => sum + (Number(l.deal_value) || 0), 0);
+
+      document.getElementById('finTotal').innerText = formatINR(totalDeal);
+      document.getElementById('finPaid').innerText = formatINR(totalPaid);
+      document.getElementById('finPending').innerText = formatINR(totalPending);
+      document.getElementById('finDevPaid').innerText = formatINR(devTotalPaid);
+      document.getElementById('finDevPending').innerText = formatINR(devPending);
+      document.getElementById('finNetProfit').innerText = formatINR(netProfit);
+      document.getElementById('finRetainer').innerText = formatINR(monthlyRetainerTotal) + '/mo';
+
+      const today = todayStr();
+      const dueLeads = allLeads.filter(l => l.followup_date && l.followup_date <= today && l.status !== 'Closed');
+      const banner = document.getElementById('followupAlertBanner');
+      if (dueLeads.length > 0) {
+        banner.classList.remove('hidden');
+        document.getElementById('followupAlertTitle').innerText = `${dueLeads.length} Follow-up(s) Due`;
+        document.getElementById('followupAlertList').innerText = dueLeads.map(l => `${l.firm_name || l.name} (${l.followup_date})`).join('  •  ');
+      } else {
+        banner.classList.add('hidden');
+        onlyDueFollowups = false;
+      }
+    }
+
+    // --- 6. RENDER TEAM PAYOUTS VIEW ---
+    function renderExpenses() {
+      const search = (document.getElementById('expenseSearchInput').value || '').toLowerCase();
+      const roleFilter = document.getElementById('expenseRoleFilter').value;
+      const statusFilter = document.getElementById('expenseStatusFilter').value;
+
+      const filtered = allExpenses.filter(e => {
+        const matchesSearch =
+          e.person_name.toLowerCase().includes(search) ||
+          (e.role && e.role.toLowerCase().includes(search)) ||
+          (e.firm_name && e.firm_name.toLowerCase().includes(search)) ||
+          (e.notes && e.notes.toLowerCase().includes(search));
+        const matchesRole = roleFilter === 'All' || e.role === roleFilter;
+        const matchesStatus = statusFilter === 'All' || e.payment_status === statusFilter;
+        return matchesSearch && matchesRole && matchesStatus;
+      });
+
+      const wrapper = document.getElementById('leadsWrapper');
+      if (filtered.length === 0) {
+        wrapper.innerHTML = `<div class="bg-white rounded-xl p-12 text-center text-zinc-400 text-xs border border-zinc-200/80">No developer or team payouts recorded yet.</div>`;
+        return;
+      }
+
+      wrapper.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
+          ${filtered.map(e => {
+            const fee = Number(e.total_fee) || 0;
+            const paid = Number(e.amount_paid) || 0;
+            const balance = Math.max(0, fee - paid);
+            const paidPercent = fee > 0 ? Math.min(100, Math.round((paid / fee) * 100)) : 0;
+
+            const cleanPhone = e.phone ? e.phone.replace(/[^0-9]/g, '') : '';
+            const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+            const waMsg = encodeURIComponent(
+              `Hi ${e.person_name}, payout update for ${e.firm_name || 'Project'} (${e.role}):\nAgreed Fee: ${formatINR(fee)}\nPaid: ${formatINR(paid)}\nBalance: ${formatINR(balance)}`
+            );
+
+            const payBadge = 
+              e.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              e.payment_status === 'Partial' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+              'bg-red-50 text-red-700 border-red-200';
+
+            return `
+            <div class="bg-white p-5 rounded-xl border border-zinc-200/80 flex flex-col justify-between space-y-4 hover:border-zinc-300 transition">
+              <div class="space-y-3">
+                <div class="flex justify-between items-start gap-2">
+                  <div>
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700">${e.role}</span>
+                    <h3 class="font-bold text-zinc-900 text-sm mt-1.5">${e.person_name}</h3>
+                    <p class="text-xs text-zinc-500">Project: <span class="text-zinc-800 font-medium">${e.firm_name || 'General Agency'}</span></p>
+                  </div>
+                  <span class="px-2 py-0.5 text-[10px] font-medium rounded-md border ${payBadge}">${e.payment_status}</span>
+                </div>
+
+                <div class="bg-zinc-50/80 p-3 rounded-lg border border-zinc-100 space-y-2">
+                  <div class="grid grid-cols-3 text-center text-xs">
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Agreed</span>
+                      <span class="font-semibold text-zinc-900">${formatINR(fee)}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Paid</span>
+                      <span class="font-semibold text-emerald-600">${formatINR(paid)}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Due</span>
+                      <span class="font-semibold ${balance > 0 ? 'text-amber-600' : 'text-zinc-400'}">${formatINR(balance)}</span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-zinc-200 h-1 rounded-full overflow-hidden">
+                    <div class="bg-zinc-900 h-full transition-all" style="width: ${paidPercent}%"></div>
+                  </div>
+                </div>
+
+                ${e.payment_date ? `<p class="text-[11px] text-zinc-500">Date: ${e.payment_date}</p>` : ''}
+                ${e.notes ? `<p class="text-xs text-zinc-600 bg-zinc-50 p-2.5 rounded-lg border border-zinc-100">${e.notes}</p>` : ''}
+              </div>
+
+              <div class="flex justify-between items-center pt-3 border-t border-zinc-100 text-xs font-medium text-zinc-600">
+                <div class="flex space-x-3">
+                  ${cleanPhone ? `<a href="tel:${cleanPhone}" class="hover:text-zinc-900">Call</a>` : ''}
+                  ${cleanPhone ? `<a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="hover:text-zinc-900">WhatsApp</a>` : ''}
+                  <button onclick="generateVoucherPDF(${e.id})" class="hover:text-zinc-900">Voucher PDF</button>
+                </div>
+                <div class="flex space-x-2.5">
+                  <button onclick="editExpense(${e.id})" class="hover:text-zinc-900">Edit</button>
+                  <button onclick="deleteExpense(${e.id})" class="text-zinc-400 hover:text-red-600">Delete</button>
+                </div>
+              </div>
+            </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // --- 7. RENDER CLIENT LEADS VIEWS ---
+    function renderLeads() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const serviceFilter = document.getElementById('serviceFilter').value;
+      const billingFilter = document.getElementById('billingFilter').value;
+      const statusFilter = document.getElementById('statusFilter').value;
+      const paymentFilter = document.getElementById('paymentFilter').value;
+      const today = todayStr();
+
+      const filtered = allLeads.filter(l => {
+        const servicesArray = parseServices(l.service_type);
+        const matchesSearch = 
+          (l.firm_name && l.firm_name.toLowerCase().includes(search)) ||
+          l.name.toLowerCase().includes(search) ||
+          (l.service_type && l.service_type.toLowerCase().includes(search)) ||
+          (l.notes && l.notes.toLowerCase().includes(search)) ||
+          (l.phone && l.phone.includes(search));
+        const matchesService = serviceFilter === 'All' || servicesArray.includes(serviceFilter);
+        const matchesBilling = billingFilter === 'All' || (l.billing_type || 'One-Time') === billingFilter;
+        const matchesStatus = statusFilter === 'All' || l.status === statusFilter;
+        const matchesPayment = paymentFilter === 'All' || l.payment_status === paymentFilter;
+        const matchesDue = !onlyDueFollowups || (l.followup_date && l.followup_date <= today && l.status !== 'Closed');
+        return matchesSearch && matchesService && matchesBilling && matchesStatus && matchesPayment && matchesDue;
+      });
+
+      const wrapper = document.getElementById('leadsWrapper');
+      if (filtered.length === 0) {
+        wrapper.innerHTML = `<div class="bg-white rounded-xl p-12 text-center text-zinc-400 text-xs border border-zinc-200/80">No matching leads found.</div>`;
+        return;
+      }
+
+      // 1. KANBAN BOARD VIEW
+      if (viewMode === 'kanban') {
+        const stages = ['New', 'Proposal Sent', 'Negotiation', 'Closed'];
+        wrapper.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            ${stages.map(stage => {
+              const stageLeads = filtered.filter(l => l.status === stage);
+              return `
+              <div class="bg-zinc-100/70 p-3.5 rounded-xl border border-zinc-200/80 space-y-3">
+                <div class="flex justify-between items-center px-1">
+                  <h3 class="font-bold text-xs text-zinc-700">${stage}</h3>
+                  <span class="bg-white text-zinc-700 border border-zinc-200 text-[11px] font-medium px-2 py-0.5 rounded-md">${stageLeads.length}</span>
+                </div>
+                <div class="space-y-2.5">
+                  ${stageLeads.map(l => {
+                    const deal = Number(l.deal_value) || 0;
+                    const paid = Number(l.amount_paid) || 0;
+                    const balance = Math.max(0, deal - paid);
+                    return `
+                    <div class="bg-white p-3.5 rounded-lg border border-zinc-200/80 space-y-2.5">
+                      <div class="flex flex-wrap gap-1">${renderServiceBadges(l.service_type)}</div>
+                      <div>
+                        <h4 class="font-bold text-zinc-900 text-xs sm:text-sm">${l.firm_name || l.name}</h4>
+                        <p class="text-[11px] text-zinc-500">${l.name}</p>
+                      </div>
+                      <div class="flex justify-between text-[11px] bg-zinc-50 p-2 rounded-md border border-zinc-100">
+                        <span class="text-zinc-500">Quote: <b class="text-zinc-900">${formatINR(deal)}</b></span>
+                        <span class="text-zinc-500">Due: <b class="text-zinc-900">${formatINR(balance)}</b></span>
+                      </div>
+                      <div class="flex items-center justify-between pt-1">
+                        <select onchange="quickChangeStage(${l.id}, this.value)" class="text-[11px] border border-zinc-200 rounded-md p-1 bg-white text-zinc-700 font-medium">
+                          ${stages.map(s => `<option value="${s}" ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                        <div class="space-x-2 text-[11px] font-medium text-zinc-600">
+                          <button onclick="openExpenseModalForLead(${l.id})" class="hover:text-zinc-900">+Dev</button>
+                          <button onclick="editLead(${l.id})" class="hover:text-zinc-900">Edit</button>
+                        </div>
+                      </div>
+                    </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+        return;
+      }
+
+      // 2. FULL-WIDTH TABLE VIEW
+      if (viewMode === 'table') {
+        wrapper.innerHTML = `
+          <div class="bg-white rounded-xl border border-zinc-200/80 overflow-x-auto w-full">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-zinc-200 bg-zinc-50/70 text-zinc-500 font-medium">
+                  <th class="p-3.5">Firm & Contact</th>
+                  <th class="p-3.5">Services</th>
+                  <th class="p-3.5">Stage</th>
+                  <th class="p-3.5">Quote / Collected / Due</th>
+                  <th class="p-3.5">Team Cost & Profit</th>
+                  <th class="p-3.5">Proposal</th>
+                  <th class="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-200/60">
+                ${filtered.map(l => {
+                  const deal = Number(l.deal_value) || 0;
+                  const paid = Number(l.amount_paid) || 0;
+                  const balance = Math.max(0, deal - paid);
+                  const devExpenses = allExpenses.filter(e => Number(e.lead_id) === l.id);
+                  const devPaid = devExpenses.reduce((s, e) => s + (Number(e.amount_paid) || 0), 0);
+                  const netProfit = paid - devPaid;
+
+                  return `
+                  <tr class="hover:bg-zinc-50/60 transition">
+                    <td class="p-3.5">
+                      <div class="font-bold text-zinc-900">${l.firm_name || 'Individual'}</div>
+                      <div class="text-[11px] text-zinc-500">${l.name} ${l.phone ? '• ' + l.phone : ''}</div>
+                    </td>
+                    <td class="p-3.5">
+                      <div class="flex flex-wrap gap-1">${renderServiceBadges(l.service_type)}</div>
+                    </td>
+                    <td class="p-3.5 font-medium text-zinc-800">${l.status}</td>
+                    <td class="p-3.5">
+                      <span class="font-semibold text-zinc-900">${formatINR(deal)}</span> / 
+                      <span class="text-emerald-600 font-semibold">${formatINR(paid)}</span> / 
+                      <span class="text-zinc-600 font-semibold">${formatINR(balance)}</span>
+                    </td>
+                    <td class="p-3.5">
+                      <span class="text-zinc-600">Dev: ${formatINR(devPaid)}</span> • 
+                      <span class="text-zinc-900 font-bold">Net: ${formatINR(netProfit)}</span>
+                    </td>
+                    <td class="p-3.5">
+                      ${l.proposal_pdf ? `<a href="${l.proposal_pdf}" target="_blank" class="text-zinc-900 font-medium underline">View PDF</a>` : '<span class="text-zinc-300">—</span>'}
+                    </td>
+                    <td class="p-3.5 text-right space-x-2.5 whitespace-nowrap font-medium text-zinc-600">
+                      <button onclick="openExpenseModalForLead(${l.id})" class="hover:text-zinc-900">+Dev</button>
+                      <button onclick="generateInvoicePDF(${l.id})" class="hover:text-zinc-900">Invoice</button>
+                      <button onclick="editLead(${l.id})" class="hover:text-zinc-900">Edit</button>
+                      <button onclick="deleteLead(${l.id})" class="text-zinc-400 hover:text-red-600">Delete</button>
+                    </td>
+                  </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. MINIMAL MULTI-COLUMN CARD GRID VIEW
+      wrapper.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
+          ${filtered.map(l => {
+            const deal = Number(l.deal_value) || 0;
+            const paid = Number(l.amount_paid) || 0;
+            const balance = Math.max(0, deal - paid);
+            const paidPercent = deal > 0 ? Math.min(100, Math.round((paid / deal) * 100)) : 0;
+
+            const linkedExpenses = allExpenses.filter(e => Number(e.lead_id) === l.id);
+            const devCostPaid = linkedExpenses.reduce((sum, e) => sum + (Number(e.amount_paid) || 0), 0);
+            const devCostTotal = linkedExpenses.reduce((sum, e) => sum + (Number(e.total_fee) || 0), 0);
+            const projectNetProfit = paid - devCostPaid;
+
+            const cleanPhone = l.phone ? l.phone.replace(/[^0-9]/g, '') : '';
+            const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+            const firmTitle = l.firm_name || l.name;
+            const proposalUrl = l.proposal_pdf ? `${window.location.origin}${l.proposal_pdf}` : '';
+            const waMsg = encodeURIComponent(
+              `Hi ${l.name}, sharing updates regarding ${firmTitle} (${l.service_type || 'Services'}).` +
+              (proposalUrl ? `\n\nProposal PDF: ${proposalUrl}` : '') +
+              (balance > 0 ? `\nPending Balance: ${formatINR(balance)}` : '')
+            );
+
+            const payBadge = 
+              l.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              l.payment_status === 'Partial' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+              'bg-red-50 text-red-700 border-red-200';
+
+            const isOverdue = l.followup_date && l.followup_date <= today && l.status !== 'Closed';
+
+            return `
+            <div class="bg-white p-5 rounded-xl border ${isOverdue ? 'border-amber-400' : 'border-zinc-200/80'} flex flex-col justify-between space-y-4 hover:border-zinc-300 transition">
+              <div class="space-y-3">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="space-y-1.5">
+                    <div class="flex flex-wrap items-center gap-1">
+                      ${renderServiceBadges(l.service_type)}
+                      ${l.billing_type === 'Monthly Retainer' ? '<span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600">Retainer</span>' : ''}
+                    </div>
+                    <h3 class="font-bold text-zinc-900 text-base tracking-tight pt-0.5">${l.firm_name || 'Individual Client'}</h3>
+                    <p class="text-xs text-zinc-500">${l.name} • ${l.source || 'Direct'}</p>
+                  </div>
+                  <div class="flex flex-col items-end gap-1 shrink-0">
+                    <span class="px-2 py-0.5 text-[10px] font-medium rounded-md bg-zinc-100 text-zinc-700">${l.status}</span>
+                    <span class="px-2 py-0.5 text-[10px] font-medium rounded-md border ${payBadge}">${l.payment_status}</span>
+                  </div>
+                </div>
+
+                <!-- Clean Financial Summary -->
+                <div class="bg-zinc-50/80 p-3 rounded-lg border border-zinc-100 space-y-2">
+                  <div class="grid grid-cols-3 text-center text-xs">
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Quote</span>
+                      <span class="font-semibold text-zinc-900">${formatINR(deal)}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Received</span>
+                      <span class="font-semibold text-emerald-600">${formatINR(paid)}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-400 block text-[10px]">Pending</span>
+                      <span class="font-semibold ${balance > 0 ? 'text-zinc-900' : 'text-zinc-400'}">${formatINR(balance)}</span>
+                    </div>
+                  </div>
+                  <div class="w-full bg-zinc-200/80 h-1 rounded-full overflow-hidden">
+                    <div class="bg-zinc-900 h-full transition-all" style="width: ${paidPercent}%"></div>
+                  </div>
+                </div>
+
+                <!-- Subtle Team Cost & Net Profit Bar -->
+                <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-50/60 border border-zinc-100 text-[11px]">
+                  <span class="text-zinc-500">Team Cost: <b class="text-zinc-800">${formatINR(devCostPaid)}</b> ${devCostTotal > devCostPaid ? `(Due: ${formatINR(devCostTotal - devCostPaid)})` : ''}</span>
+                  <span class="text-zinc-500">Net: <b class="text-zinc-900">${formatINR(projectNetProfit)}</b></span>
+                </div>
+
+                ${l.proposal_pdf ? `
+                <div class="flex items-center justify-between bg-zinc-50 border border-zinc-200/70 px-3 py-2 rounded-lg text-xs">
+                  <span class="font-medium text-zinc-700 truncate pr-2">${l.proposal_name || 'Proposal.pdf'}</span>
+                  <div class="flex space-x-2 shrink-0 font-medium">
+                    <a href="${l.proposal_pdf}" target="_blank" class="text-zinc-900 hover:underline">View</a>
+                    <a href="${l.proposal_pdf}" download class="text-zinc-400 hover:text-zinc-900">↓</a>
+                  </div>
+                </div>
+                ` : ''}
+
+                ${l.followup_date ? `<p class="text-[11px] ${isOverdue ? 'text-amber-700 font-semibold' : 'text-zinc-500'}">Follow-up: ${l.followup_date} ${isOverdue ? '• Due' : ''}</p>` : ''}
+                ${l.notes ? `<p class="text-xs text-zinc-600 line-clamp-2">${l.notes}</p>` : ''}
+              </div>
+
+              <div class="flex justify-between items-center pt-3 border-t border-zinc-100 text-xs font-medium text-zinc-600">
+                <div class="flex space-x-3">
+                  ${cleanPhone ? `<a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="hover:text-zinc-900">WhatsApp</a>` : ''}
+                  <button onclick="generateInvoicePDF(${l.id})" class="hover:text-zinc-900">Invoice</button>
+                  <button onclick="openExpenseModalForLead(${l.id})" class="hover:text-zinc-900">+Dev</button>
+                </div>
+                <div class="flex space-x-2.5">
+                  <button onclick="editLead(${l.id})" class="hover:text-zinc-900">Edit</button>
+                  <button onclick="deleteLead(${l.id})" class="text-zinc-400 hover:text-red-600">Delete</button>
+                </div>
+              </div>
+            </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // --- 8. EXPENSE MODAL HANDLERS ---
+    function openExpenseModal(exp = null) {
+      document.getElementById('expenseModal').classList.remove('hidden');
+      if (exp) {
+        document.getElementById('expenseModalTitle').innerText = 'Edit Team Payout';
+        document.getElementById('expenseId').value = exp.id;
+        document.getElementById('exp_person_name').value = exp.person_name;
+        document.getElementById('exp_role').value = exp.role || 'Web Developer';
+        document.getElementById('exp_lead_id').value = exp.lead_id || '';
+        document.getElementById('exp_phone').value = exp.phone || '';
+        document.getElementById('exp_total_fee').value = exp.total_fee || 0;
+        document.getElementById('exp_amount_paid').value = exp.amount_paid || 0;
+        document.getElementById('exp_payment_status').value = exp.payment_status || 'Unpaid';
+        document.getElementById('exp_payment_date').value = exp.payment_date || todayStr();
+        document.getElementById('exp_notes').value = exp.notes || '';
+      } else {
+        document.getElementById('expenseModalTitle').innerText = 'Record Team / Developer Payout';
+        document.getElementById('expenseForm').reset();
+        document.getElementById('expenseId').value = '';
+        document.getElementById('exp_total_fee').value = 0;
+        document.getElementById('exp_amount_paid').value = 0;
+        document.getElementById('exp_payment_status').value = 'Unpaid';
+        document.getElementById('exp_payment_date').value = todayStr();
+      }
+    }
+
+    function openExpenseModalForLead(leadId) {
+      openExpenseModal();
+      document.getElementById('exp_lead_id').value = leadId;
+    }
+
+    function closeExpenseModal() {
+      document.getElementById('expenseModal').classList.add('hidden');
+    }
+
+    function editExpense(id) {
+      const exp = allExpenses.find(e => e.id === id);
+      if (exp) openExpenseModal(exp);
+    }
+
+    async function saveExpense(e) {
+      e.preventDefault();
+      const id = document.getElementById('expenseId').value;
+      const leadSelect = document.getElementById('exp_lead_id');
+      const leadId = leadSelect.value;
+      const selectedLead = allLeads.find(l => String(l.id) === String(leadId));
+      const firmName = selectedLead ? (selectedLead.firm_name || selectedLead.name) : 'General Agency';
+
+      const payload = {
+        lead_id: leadId || null,
+        firm_name: firmName,
+        person_name: document.getElementById('exp_person_name').value,
+        role: document.getElementById('exp_role').value,
+        phone: document.getElementById('exp_phone').value,
+        total_fee: Number(document.getElementById('exp_total_fee').value) || 0,
+        amount_paid: Number(document.getElementById('exp_amount_paid').value) || 0,
+        payment_status: document.getElementById('exp_payment_status').value,
+        payment_date: document.getElementById('exp_payment_date').value,
+        notes: document.getElementById('exp_notes').value
+      };
+
+      await fetch(id ? `/api/expenses/${id}` : '/api/expenses', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      closeExpenseModal();
+      fetchAllData();
+    }
+
+    async function deleteExpense(id) {
+      if (confirm('Delete this payout record?')) {
+        await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+        fetchAllData();
+      }
+    }
+
+    // --- 9. LEAD MODAL HANDLERS ---
+    function openModal(lead = null) {
+      document.getElementById('leadModal').classList.remove('hidden');
+      document.getElementById('proposal').value = '';
+      const pdfLabel = document.getElementById('currentPdfLabel');
+
+      if (lead) {
+        document.getElementById('modalTitle').innerText = 'Edit Firm & Proposal';
+        document.getElementById('leadId').value = lead.id;
+        document.getElementById('firm_name').value = lead.firm_name || '';
+        document.getElementById('name').value = lead.name;
+        
+        selectedServicesInModal = parseServices(lead.service_type);
+        renderMultiServicePills();
+
+        document.getElementById('billing_type').value = lead.billing_type || 'One-Time';
+        document.getElementById('phone').value = lead.phone || '';
+        document.getElementById('email').value = lead.email || '';
+        document.getElementById('source').value = lead.source || 'Direct';
+        document.getElementById('status').value = lead.status || 'New';
+        document.getElementById('followup_date').value = lead.followup_date || '';
+        document.getElementById('deal_value').value = lead.deal_value || 0;
+        document.getElementById('amount_paid').value = lead.amount_paid || 0;
+        document.getElementById('payment_status').value = lead.payment_status || 'Unpaid';
+        document.getElementById('notes').value = lead.notes || '';
+
+        if (lead.proposal_name) {
+          pdfLabel.innerText = `Current: ${lead.proposal_name} (Upload new to replace)`;
+          pdfLabel.classList.remove('hidden');
+        } else {
+          pdfLabel.classList.add('hidden');
+        }
+      } else {
+        document.getElementById('modalTitle').innerText = 'New Firm & Proposal';
+        document.getElementById('leadForm').reset();
+        document.getElementById('leadId').value = '';
+        selectedServicesInModal = allServices.length > 0 ? [allServices[0].name] : ['SMM'];
+        renderMultiServicePills();
+        document.getElementById('billing_type').value = 'One-Time';
+        document.getElementById('deal_value').value = 0;
+        document.getElementById('amount_paid').value = 0;
+        document.getElementById('payment_status').value = 'Unpaid';
+        pdfLabel.classList.add('hidden');
+      }
+    }
+
+    function closeModal() { document.getElementById('leadModal').classList.add('hidden'); }
+
+    function editLead(id) {
+      const lead = allLeads.find(l => l.id === id);
+      if (lead) openModal(lead);
+    }
+
+    async function saveLead(e) {
+      e.preventDefault();
+      const id = document.getElementById('leadId').value;
+      const formData = new FormData();
+
+      formData.append('firm_name', document.getElementById('firm_name').value);
+      formData.append('name', document.getElementById('name').value);
+      formData.append('service_type', selectedServicesInModal.join(', '));
+      formData.append('billing_type', document.getElementById('billing_type').value);
+      formData.append('phone', document.getElementById('phone').value);
+      formData.append('email', document.getElementById('email').value);
+      formData.append('source', document.getElementById('source').value);
+      formData.append('status', document.getElementById('status').value);
+      formData.append('followup_date', document.getElementById('followup_date').value);
+      formData.append('deal_value', document.getElementById('deal_value').value || 0);
+      formData.append('amount_paid', document.getElementById('amount_paid').value || 0);
+      formData.append('payment_status', document.getElementById('payment_status').value);
+      formData.append('notes', document.getElementById('notes').value);
+
+      const pdfFile = document.getElementById('proposal').files[0];
+      if (pdfFile) formData.append('proposal', pdfFile);
+
+      const res = await fetch(id ? `/api/leads/${id}` : '/api/leads', {
+        method: id ? 'PUT' : 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        alert('Error saving lead. Ensure attached file is a PDF under 5MB.');
+        return;
+      }
+
+      closeModal();
+      fetchAllData();
+    }
+
+    async function deleteLead(id) {
+      if (confirm('Delete this firm record and its attached PDF proposal?')) {
+        await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+        fetchAllData();
+      }
+    }
+
+    fetchServices().then(fetchAllData);
+  </script>
+</body>
+</html>
