@@ -256,6 +256,6 @@ app.post('/api/webhooks/lead', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT} (Admin PIN: ${CRM_PIN})`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${PORT} (Admin PIN: ${CRM_PIN})`);
 });
