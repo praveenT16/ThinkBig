@@ -22,6 +22,9 @@ uploads/*
 # Local binaries
 bin/
 
+# Client projects
+Stitch&Craft/
+
 # OS / Editor files
 .DS_Store
 Thumbs.db
