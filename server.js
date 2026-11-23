@@ -85,8 +85,18 @@ app.post('/api/leads', upload.single('proposal'), (req, res) => {
     deal_value, amount_paid, payment_status, followup_date, notes
   } = req.body;
 
-  const proposal_pdf = req.file ? `/uploads/${req.file.filename}` : '';
+  let proposal_pdf = '';
   const proposal_name = req.file ? req.file.originalname : '';
+  if (req.file) {
+    try {
+      const fileData = fs.readFileSync(req.file.path).toString('base64');
+      proposal_pdf = `data:application/pdf;base64,${fileData}`;
+      // Clean up temporary disk file
+      fs.unlink(req.file.path, () => {});
+    } catch (e) {
+      proposal_pdf = `/uploads/${req.file.filename}`;
+    }
+  }
 
   const query = `
     INSERT INTO leads 
@@ -121,11 +131,17 @@ app.put('/api/leads/:id', upload.single('proposal'), (req, res) => {
     let proposal_name = row ? row.proposal_name : '';
 
     if (req.file) {
-      if (proposal_pdf) {
+      if (proposal_pdf && proposal_pdf.startsWith('/uploads/')) {
         const oldPath = path.join(__dirname, proposal_pdf);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
-      proposal_pdf = `/uploads/${req.file.filename}`;
+      try {
+        const fileData = fs.readFileSync(req.file.path).toString('base64');
+        proposal_pdf = `data:application/pdf;base64,${fileData}`;
+        fs.unlink(req.file.path, () => {});
+      } catch (e) {
+        proposal_pdf = `/uploads/${req.file.filename}`;
+      }
       proposal_name = req.file.originalname;
     }
 
@@ -148,6 +164,25 @@ app.put('/api/leads/:id', upload.single('proposal'), (req, res) => {
       if (updateErr) return res.status(500).json({ error: updateErr.message });
       res.json({ updated: this.changes, proposal_pdf, proposal_name });
     });
+  });
+});
+
+// View / download proposal endpoint
+app.get('/api/leads/:id/proposal', (req, res) => {
+  db.get(`SELECT proposal_pdf, proposal_name FROM leads WHERE id = ?`, [req.params.id], (err, row) => {
+    if (err || !row || !row.proposal_pdf) return res.status(404).send('Proposal not found');
+    if (row.proposal_pdf.startsWith('data:application/pdf;base64,')) {
+      const base64Data = row.proposal_pdf.replace('data:application/pdf;base64,', '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${row.proposal_name || 'proposal.pdf'}"`);
+      return res.send(buffer);
+    } else if (row.proposal_pdf.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, row.proposal_pdf);
+      if (fs.existsSync(filePath)) return res.sendFile(filePath);
+      return res.status(404).send('File expired on temporary disk');
+    }
+    res.redirect(row.proposal_pdf);
   });
 });
 

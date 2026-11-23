@@ -59,7 +59,12 @@
     <div class="flex items-center space-x-3">
       <div class="w-8 h-8 bg-black text-white font-black rounded-lg flex items-center justify-center text-xs tracking-tighter shadow-sm">TB</div>
       <div>
-        <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white">ThinkBig CRM</h1>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white">ThinkBig CRM</h1>
+          <span class="inline-flex items-center gap-1 text-[10px] bg-black/30 text-white border border-white/20 px-2 py-0.5 rounded-full font-bold">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Turso Cloud (Permanent)
+          </span>
+        </div>
         <p class="text-[11px] text-white/90">Leads • Multi-Service Proposals • Team Payouts</p>
       </div>
     </div>
@@ -1078,7 +1083,7 @@
                       <span class="font-extrabold text-black">Net: ${formatINR(netProfit)}</span>
                     </td>
                     <td class="p-3.5">
-                      ${l.proposal_pdf ? `<a href="${l.proposal_pdf}" target="_blank" class="text-black font-bold underline hover:text-orange-600 transition">View PDF</a>` : '<span class="text-black/40">—</span>'}
+                      ${l.proposal_pdf ? `<a href="/api/leads/${l.id}/proposal" target="_blank" class="text-black font-bold underline hover:text-orange-600 transition">View PDF</a>` : '<span class="text-black/40">—</span>'}
                     </td>
                     <td class="p-3.5 text-right space-x-2.5 whitespace-nowrap font-bold text-black">
                       <button onclick="openExpenseModalForLead(${l.id})" class="hover:text-orange-600 transition">+Dev</button>
@@ -1113,7 +1118,7 @@
             const cleanPhone = l.phone ? l.phone.replace(/[^0-9]/g, '') : '';
             const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
             const firmTitle = l.firm_name || l.name;
-            const proposalUrl = l.proposal_pdf ? `${window.location.origin}${l.proposal_pdf}` : '';
+            const proposalUrl = l.proposal_pdf ? `${window.location.origin}/api/leads/${l.id}/proposal` : '';
             const waMsg = encodeURIComponent(
               `Hi ${l.name}, sharing updates regarding ${firmTitle} (${l.service_type || 'Services'}).` +
               (proposalUrl ? `\n\nProposal PDF: ${proposalUrl}` : '') +
@@ -1176,8 +1181,8 @@
                 <div class="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 px-3 py-2 rounded-lg text-xs">
                   <span class="font-bold text-black truncate pr-2">${l.proposal_name || 'Proposal.pdf'}</span>
                   <div class="flex space-x-2 shrink-0 font-bold">
-                    <a href="${l.proposal_pdf}" target="_blank" class="text-black hover:text-orange-600 underline transition">View</a>
-                    <a href="${l.proposal_pdf}" download class="text-black/60 hover:text-black transition">↓</a>
+                    <a href="/api/leads/${l.id}/proposal" target="_blank" class="text-black hover:text-orange-600 underline transition">View</a>
+                    <a href="/api/leads/${l.id}/proposal" download="${l.proposal_name || 'proposal.pdf'}" class="text-black/60 hover:text-black transition">↓</a>
                   </div>
                 </div>
                 ` : ''}

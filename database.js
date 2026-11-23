@@ -1,8 +1,11 @@
 require('dotenv').config();
 const path = require('path');
 
-const tursoUrl = process.env.TURSO_DATABASE_URL;
-const tursoToken = process.env.TURSO_AUTH_TOKEN;
+const DEFAULT_TURSO_URL = 'libsql://thinkbig-crm-praveent.aws-ap-south-1.turso.io';
+const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTQ3NDk5ODIsImlkIjoiMDFhMWRmNmUtODkwMS03ZjQyLTgxNWMtOWMzODRmZjBkNjIwIiwia2lkIjoiSEdnZHFKRm8wMnZKbV9tbnNuLVJBTGxZaHR1NnNNdlRGVHlULWlrM3dpdyIsInJpZCI6IjFhZWQ3N2M1LTgxMDMtNDU4Zi05ZDgwLTI4NzE3Y2JjMGFkOSJ9.JzWunYpxhU3Z-bVCGmzgQx97clAoqRRYw_mso_AAYC7i3_EJgSxS0H8BwriDKg_F6TJH100LUxccCogaHj2yAA';
+
+const tursoUrl = process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_TOKEN;
 
 let db;
 
